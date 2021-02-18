@@ -20,10 +20,129 @@ import (
 )
 
 var (
-	ports = []string{":10001", ":10002", ":10003"}
+	ports = []string{":10001", ":10002"}
 )
 
-var configDump = `{"xdsConfig":[{"clientStatus":2,"listenerConfig":{"dynamicListeners":[{"activeState":{"lastUpdated":"2021-01-20T19:46:14.720363332Z","listener":{"@type":"type.googleapis.com/envoy.config.listener.v3.Listener","apiListener":{"apiListener":{"@type":"type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager","routeConfig":{"name":"route_config_name","virtualHosts":[{"domains":["*"],"routes":[{"match":{"prefix":""},"route":{"cluster":"cluster_name"}}]}]}}},"name":"server.example.com"},"versionInfo":"1"},"name":"server.example.com"}],"versionInfo":"1"}},{"clientStatus":0,"routeConfig":{"dynamicRouteConfigs":[]}},{"clientStatus":2,"clusterConfig":{"dynamicActiveClusters":[{"cluster":{"@type":"type.googleapis.com/envoy.config.cluster.v3.Cluster","edsClusterConfig":{"edsConfig":{"ads":{}},"serviceName":"eds_service_name"},"name":"cluster_name","type":"EDS"},"lastUpdated":"2021-01-20T19:46:14.731363449Z","versionInfo":"1"}],"versionInfo":"1"}},{"clientStatus":2,"endpointConfig":{"dynamicEndpointConfigs":[{"endpointConfig":{"@type":"type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment","clusterName":"eds_service_name","endpoints":[{"lbEndpoints":[{"endpoint":{"address":{"socketAddress":{"address":"127.0.0.1","portValue":19153}}}},{"endpoint":{"address":{"socketAddress":{"address":"127.0.0.1","portValue":15969}}}},{"endpoint":{"address":{"socketAddress":{"address":"127.0.0.1","portValue":31459}}}},{"endpoint":{"address":{"socketAddress":{"address":"127.0.0.1","portValue":24536}}}}],"loadBalancingWeight":3,"locality":{"region":"xds_default_locality_region","subZone":"locality0","zone":"xds_default_locality_zone"}}]},"lastUpdated":"2021-01-20T19:46:14.741363465Z","versionInfo":"1"}],"versionInfo":"1"}}]}`
+var configDump = `{
+	"xdsConfig": [{
+		"clientStatus": 2,
+		"listenerConfig": {
+			"dynamicListeners": [{
+				"activeState": {
+					"lastUpdated": "2021-02-08T21:52:35.362543975Z",
+					"listener": {
+						"@type": "type.googleapis.com/envoy.config.listener.v3.Listener",
+						"apiListener": {
+							"apiListener": {
+								"@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager",
+								"routeConfig": {
+									"name": "route_config_name",
+									"virtualHosts": [{
+										"domains": ["*"],
+										"routes": [{
+											"match": {
+												"prefix": ""
+											},
+											"route": {
+												"cluster": "cluster_name"
+											}
+										}]
+									}]
+								}
+							}
+						},
+						"name": "server.example.com"
+					},
+					"versionInfo": "1"
+				},
+				"name": "server.example.com"
+			}],
+			"versionInfo": "1"
+		}
+	}, {
+		"clientStatus": 0,
+		"routeConfig": {
+			"dynamicRouteConfigs": []
+		}
+	}, {
+		"clientStatus": 2,
+		"clusterConfig": {
+			"dynamicActiveClusters": [{
+				"cluster": {
+					"@type": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
+					"edsClusterConfig": {
+						"edsConfig": {
+							"ads": {}
+						},
+						"serviceName": "eds_service_name"
+					},
+					"name": "cluster_name",
+					"type": "EDS"
+				},
+				"lastUpdated": "2021-02-08T21:52:35.375544049Z",
+				"versionInfo": "1"
+			}],
+			"versionInfo": "1"
+		}
+	}, {
+		"clientStatus": 2,
+		"endpointConfig": {
+			"dynamicEndpointConfigs": [{
+				"endpointConfig": {
+					"@type": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
+					"clusterName": "eds_service_name",
+					"endpoints": [{
+						"lbEndpoints": [{
+							"endpoint": {
+								"address": {
+									"socketAddress": {
+										"address": "127.0.0.1",
+										"portValue": 1916
+									}
+								}
+							}
+						}, {
+							"endpoint": {
+								"address": {
+									"socketAddress": {
+										"address": "127.0.0.1",
+										"portValue": 27097
+									}
+								}
+							}
+						}, {
+							"endpoint": {
+								"address": {
+									"socketAddress": {
+										"address": "127.0.0.1",
+										"portValue": 26818
+									}
+								}
+							}
+						}, {
+							"endpoint": {
+								"address": {
+									"socketAddress": {
+										"address": "127.0.0.1",
+										"portValue": 28489
+									}
+								}
+							}
+						}],
+						"loadBalancingWeight": 3,
+						"locality": {
+							"region": "xds_default_locality_region",
+							"subZone": "locality0",
+							"zone": "xds_default_locality_zone"
+						}
+					}]
+				},
+				"lastUpdated": "2021-02-08T21:52:35.384544046Z",
+				"versionInfo": "1"
+			}]
+		}
+	}]
+}`
 
 // server is used to implement helloworld.GreeterServer.
 type server struct {
@@ -77,7 +196,7 @@ func main() {
 	defer s.Stop()
 
 	/***** Start three GreeterServers(with one of them to be the slowServer). *****/
-	for i := 0; i < 3; i++ {
+	for i := 0; i < 2; i++ {
 		lis, err := net.Listen("tcp", ports[i])
 		if err != nil {
 			log.Fatalf("failed to listen: %v", err)

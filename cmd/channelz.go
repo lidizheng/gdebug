@@ -8,7 +8,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
-	"gdebug/transport"
+	"grpcdebug/transport"
 
 	"github.com/dustin/go-humanize"
 	"github.com/golang/protobuf/ptypes"

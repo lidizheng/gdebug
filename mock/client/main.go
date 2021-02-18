@@ -44,7 +44,7 @@ func main() {
 	/***** Initialize manual resolver and Dial *****/
 	r := manual.NewBuilderWithScheme("whatever")
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(r.Scheme()+":///test.server", grpc.WithInsecure(), grpc.WithResolvers(r), grpc.WithBalancerName("round_robin"))
+	conn, err := grpc.Dial(r.Scheme()+":///x.test.youtube.com", grpc.WithInsecure(), grpc.WithResolvers(r), grpc.WithBalancerName("round_robin"))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
@@ -73,6 +73,7 @@ func main() {
 		}
 	}
 
+	fmt.Println("Sending message to :10001 :10002 :10003")
 	fmt.Println("Serving Admin Services with TLS encryption on :50052")
 	fmt.Println("CA file: /Users/lidiz/src/google.golang.org/grpc/testdata/ca.pem")
 	fmt.Println("Server Name Override: x.test.youtube.com")

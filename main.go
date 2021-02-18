@@ -1,7 +1,7 @@
 package main
 
 import (
-	cmd "gdebug/cmd"
+	cmd "grpcdebug/cmd"
 )
 
 func main() {

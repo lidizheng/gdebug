@@ -2,9 +2,12 @@ package cmd
 
 import (
 	"fmt"
+	"grpcdebug/transport"
 
+	_ "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	csdspb "github.com/envoyproxy/go-control-plane/envoy/service/status/v3"
 	"github.com/spf13/cobra"
+	"google.golang.org/protobuf/encoding/protojson"
 )
 
 var configDump = `{
@@ -155,13 +158,22 @@ var configListener = `{
 }`
 
 func xdsConfigCommandRunWithError(cmd *cobra.Command, args []string) error {
-	// clientStatus := transport.FetchClientStatus()
-	// fmt.Print(protojson.Format(clientStatus))
-	if len(args) > 0 && args[0] == "listeners" {
-		fmt.Print(configListener)
-	} else {
-		fmt.Print(configDump)
+	clientStatus := transport.FetchClientStatus()
+	// fmt.Print(clientStatus)
+	jsonbytes, err := protojson.Marshal(clientStatus)
+	if err != nil {
+		return err
 	}
+	fmt.Println(string(jsonbytes))
+	// if len(args) > 0 {
+	// 	if args[0] == "listeners" {
+	// 		fmt.Print(configListener)
+	// 	} else {
+	// 		return fmt.Errorf("Only support filtering \"listeners\" right now")
+	// 	}
+	// } else {
+	// 	fmt.Print(configDump)
+	// }
 	return nil
 }
 

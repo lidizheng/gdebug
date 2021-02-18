@@ -7,8 +7,8 @@ import (
 	"log"
 	"os"
 
-	"gdebug/transport"
-	"gdebug/utils"
+	"grpcdebug/transport"
+	"grpcdebug/utils"
 
 	"github.com/spf13/cobra"
 )
@@ -18,7 +18,7 @@ var address, security, credFile, serverNameOverride string
 
 var rootUsageTemplate = `Usage:{{if .Runnable}}
   {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
-  gdebug <target address> [flags] {{ .CommandPath | ChildCommandPath }} <command>{{end}}{{if gt (len .Aliases) 0}}
+  grpcdebug <target address> [flags] {{ .CommandPath | ChildCommandPath }} <command>{{end}}{{if gt (len .Aliases) 0}}
 
 Aliases:
   {{.NameAndAliases}}{{end}}{{if .HasExample}}
@@ -38,12 +38,12 @@ Global Flags:
 Additional help topics:{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
   {{rpad .CommandPath .CommandPathPadding}} {{.Short}}{{end}}{{end}}{{end}}{{if .HasAvailableSubCommands}}
 
-Use "gdebug <target address> {{ .CommandPath | ChildCommandPath }} [command] --help" for more information about a command.{{end}}
+Use "grpcdebug <target address> {{ .CommandPath | ChildCommandPath }} [command] --help" for more information about a command.{{end}}
 `
 
 var rootCmd = &cobra.Command{
-	Use:   "gdebug",
-	Short: "gdebug is an gRPC service admin CLI",
+	Use:   "grpcdebug",
+	Short: "grpcdebug is an gRPC service admin CLI",
 }
 
 func initConfig() {
