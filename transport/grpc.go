@@ -5,16 +5,19 @@ import (
 	"log"
 	"time"
 
+	_ "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/router/v3"
 	csdspb "github.com/envoyproxy/go-control-plane/envoy/service/status/v3"
 	"google.golang.org/grpc"
 	zpb "google.golang.org/grpc/channelz/grpc_channelz_v1"
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/credentials"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 )
 
 var conn *grpc.ClientConn
 var channelzClient zpb.ChannelzClient
 var csdsClient csdspb.ClientStatusDiscoveryServiceClient
+var healthClient healthpb.HealthClient
 
 // Connect connects to the service at address and creates stubs
 func Connect(address, certFile, serverNameOverride string) {
@@ -36,6 +39,7 @@ func Connect(address, certFile, serverNameOverride string) {
 	}
 	channelzClient = zpb.NewChannelzClient(conn)
 	csdsClient = csdspb.NewClientStatusDiscoveryServiceClient(conn)
+	healthClient = healthpb.NewHealthClient(conn)
 	// Wait for ready
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*5)
 	defer cancel()
@@ -140,4 +144,12 @@ func FetchClientStatus() *csdspb.ClientStatusResponse {
 		log.Fatalf("failed to fetch xds config: %v", err)
 	}
 	return resp
+}
+
+func GetHealthStatus(service string) string {
+	resp, err := healthClient.Check(context.Background(), &healthpb.HealthCheckRequest{Service: service})
+	if err != nil {
+		log.Fatalf("failed to fetch health status for \"%s\": %v", service, err)
+	}
+	return healthpb.HealthCheckResponse_ServingStatus_name[int32(resp.Status)]
 }

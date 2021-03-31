@@ -3,239 +3,175 @@ package cmd
 import (
 	"fmt"
 	"grpcdebug/transport"
+	"strings"
 
+	adminpb "github.com/envoyproxy/go-control-plane/envoy/admin/v3"
+	clusterpb "github.com/envoyproxy/go-control-plane/envoy/config/cluster/v3"
+	endpointpb "github.com/envoyproxy/go-control-plane/envoy/config/endpoint/v3"
+	routepb "github.com/envoyproxy/go-control-plane/envoy/config/route/v3"
+	_ "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/fault/v3"
+	_ "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/router/v3"
 	_ "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/network/http_connection_manager/v3"
 	csdspb "github.com/envoyproxy/go-control-plane/envoy/service/status/v3"
+	"github.com/golang/protobuf/ptypes"
+	timestamppb "github.com/golang/protobuf/ptypes/timestamp"
 	"github.com/spf13/cobra"
 	"google.golang.org/protobuf/encoding/protojson"
+	"google.golang.org/protobuf/proto"
 )
 
-var configDump = `{
-	"xdsConfig": [{
-		"clientStatus": 2,
-		"listenerConfig": {
-			"dynamicListeners": [{
-				"activeState": {
-					"lastUpdated": "2021-01-20T19:46:14.720363332Z",
-					"listener": {
-						"@type": "type.googleapis.com/envoy.config.listener.v3.Listener",
-						"apiListener": {
-							"apiListener": {
-								"@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager",
-								"routeConfig": {
-									"name": "route_config_name",
-									"virtualHosts": [{
-										"domains": ["*"],
-										"routes": [{
-											"match": {
-												"prefix": ""
-											},
-											"route": {
-												"cluster": "cluster_name"
-											}
-										}]
-									}]
-								}
-							}
-						},
-						"name": "x.test.youtube.com"
-					},
-					"versionInfo": "1"
-				},
-				"name": "x.test.youtube.com"
-			}],
-			"versionInfo": "1"
-		}
-	}, {
-		"clientStatus": 0,
-		"routeConfig": {
-			"dynamicRouteConfigs": []
-		}
-	}, {
-		"clientStatus": 2,
-		"clusterConfig": {
-			"dynamicActiveClusters": [{
-				"cluster": {
-					"@type": "type.googleapis.com/envoy.config.cluster.v3.Cluster",
-					"edsClusterConfig": {
-						"edsConfig": {
-							"ads": {}
-						},
-						"serviceName": "eds_service_name"
-					},
-					"name": "cluster_name",
-					"type": "EDS"
-				},
-				"lastUpdated": "2021-01-20T19:46:14.731363449Z",
-				"versionInfo": "1"
-			}],
-			"versionInfo": "1"
-		}
-	}, {
-		"clientStatus": 2,
-		"endpointConfig": {
-			"dynamicEndpointConfigs": [{
-				"endpointConfig": {
-					"@type": "type.googleapis.com/envoy.config.endpoint.v3.ClusterLoadAssignment",
-					"clusterName": "eds_service_name",
-					"endpoints": [{
-						"lbEndpoints": [{
-							"endpoint": {
-								"address": {
-									"socketAddress": {
-										"address": "127.0.0.1",
-										"portValue": 10001
-									}
-								}
-							}
-						}, {
-							"endpoint": {
-								"address": {
-									"socketAddress": {
-										"address": "127.0.0.1",
-										"portValue": 10002
-									}
-								}
-							}
-						}, {
-							"endpoint": {
-								"address": {
-									"socketAddress": {
-										"address": "127.0.0.1",
-										"portValue": 10003
-									}
-								}
-							}
-						}],
-						"loadBalancingWeight": 3,
-						"locality": {
-							"region": "xds_default_locality_region",
-							"subZone": "locality0",
-							"zone": "xds_default_locality_zone"
-						}
-					}]
-				},
-				"lastUpdated": "2021-01-20T19:46:14.741363465Z",
-				"versionInfo": "1"
-			}],
-			"versionInfo": "1"
-		}
-	}]
-}`
-
-var configListener = `{
-	"dynamicListeners": [{
-		"activeState": {
-			"lastUpdated": "2021-01-20T19:46:14.720363332Z",
-			"listener": {
-				"@type": "type.googleapis.com/envoy.config.listener.v3.Listener",
-				"apiListener": {
-					"apiListener": {
-						"@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager",
-						"routeConfig": {
-							"name": "route_config_name",
-							"virtualHosts": [{
-								"domains": ["*"],
-								"routes": [{
-									"match": {
-										"prefix": ""
-									},
-									"route": {
-										"cluster": "cluster_name"
-									}
-								}]
-							}]
-						}
-					}
-				},
-				"name": "x.test.youtube.com"
-			},
-			"versionInfo": "1"
-		},
-		"name": "x.test.youtube.com"
-	}],
-	"versionInfo": "1"
-}`
-
-func xdsConfigCommandRunWithError(cmd *cobra.Command, args []string) error {
-	clientStatus := transport.FetchClientStatus()
-	// fmt.Print(clientStatus)
-	jsonbytes, err := protojson.Marshal(clientStatus)
+func printJson(m proto.Message) error {
+	var option protojson.MarshalOptions
+	option.Multiline = true
+	option.Indent = "  "
+	option.UseProtoNames = false
+	option.UseEnumNumbers = false
+	jsonbytes, err := option.Marshal(m)
 	if err != nil {
 		return err
 	}
 	fmt.Println(string(jsonbytes))
-	// if len(args) > 0 {
-	// 	if args[0] == "listeners" {
-	// 		fmt.Print(configListener)
-	// 	} else {
-	// 		return fmt.Errorf("Only support filtering \"listeners\" right now")
-	// 	}
-	// } else {
-	// 	fmt.Print(configDump)
-	// }
 	return nil
+}
+
+func xdsConfigCommandRunWithError(cmd *cobra.Command, args []string) error {
+	clientStatus := transport.FetchClientStatus()
+	if len(args) == 0 {
+		return printJson(clientStatus)
+	}
+	// Filter the CSDS output
+	var demand string
+	demand = strings.ToLower(args[0])
+	for _, xds_config := range clientStatus.Config[0].XdsConfig {
+		switch x := xds_config.PerXdsConfig.(type) {
+		case *csdspb.PerXdsConfig_ListenerConfig:
+			if demand == "lds" {
+				return printJson(xds_config.GetListenerConfig())
+			}
+		case *csdspb.PerXdsConfig_RouteConfig:
+			if demand == "rds" {
+				return printJson(xds_config.GetRouteConfig())
+			}
+		case *csdspb.PerXdsConfig_ClusterConfig:
+			if demand == "cds" {
+				return printJson(xds_config.GetClusterConfig())
+			}
+		case *csdspb.PerXdsConfig_EndpointConfig:
+			if demand == "eds" {
+				return printJson(xds_config.GetEndpointConfig())
+			}
+		default:
+			return fmt.Errorf("Unexpected type %T", x)
+		}
+	}
+	return fmt.Errorf("Failed to find xDS config with type %s", args[0])
 }
 
 var xdsConfigCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Dump the operating xDS configs.",
 	RunE:  xdsConfigCommandRunWithError,
+	Args:  cobra.MaximumNArgs(1),
 }
 
-type xdsStatusEntry struct {
-	Name    string
-	Status  string
-	Version string
+type xdsResourceStatusEntry struct {
+	Name        string
+	Status      adminpb.ClientResourceStatus
+	Version     string
+	Type        string
+	LastUpdated *timestamppb.Timestamp
 }
 
-func prettyClientConfigStatus(s csdspb.ClientConfigStatus) string {
-	return csdspb.ClientConfigStatus_name[int32(s)]
+func prettyClientResourceStatus(s adminpb.ClientResourceStatus) string {
+	return adminpb.ClientResourceStatus_name[int32(s)]
+}
+
+func printStatusEntry(entry *xdsResourceStatusEntry) {
+	fmt.Fprintf(
+		w, "%v\t%v\t%v\t%v\t%v\t\n",
+		entry.Name,
+		prettyClientResourceStatus(entry.Status),
+		entry.Version,
+		entry.Type,
+		prettyTime(entry.LastUpdated),
+	)
 }
 
 func xdsStatusCommandRunWithError(cmd *cobra.Command, args []string) error {
-	// clientStatus := transport.FetchClientStatus()
+	clientStatus := transport.FetchClientStatus()
 
-	fmt.Fprintln(w, "Name\tStatus\tVersion\t")
-
-	// config := clientStatus.Config[0]
-	// for _, xdsConfig := range config.XdsConfig {
-	// 	var entry = xdsStatusEntry{
-	// 		Status: prettyClientConfigStatus(xdsConfig.ClientStatus),
-	// 	}
-
-	// 	switch x := xdsConfig.PerXdsConfig.(type) {
-	// 	case *adminpb.ListenersConfigDump:
-	// 		entry.Name = "LDS"
-	// 		entry.Version = xdsConfig.PerXdsConfig.VersionInfo
-	// 	case *adminpb.ClustersConfigDump:
-	// 		entry.Name = "CDS"
-	// 	case *adminpb.RoutesConfigDump:
-	// 		entry.Name = "RDS"
-	// 	case *adminpb.ScopedRoutesConfigDump:
-	// 		log.Panic("Not implemented")
-	// 	case *adminpb.EndpointsConfigDump:
-	// 		entry.Name = "EDS"
-	// 	default:
-	// 		log.Fatalf("failed to read per_xds_config value")
-	// 	}
-
-	// 	fmt.Fprintf(
-	// 		w, "%v\t%v\t%v\t\n",
-	// 		entry.Name,
-	// 		entry.Status,
-	// 		entry.Version,
-	// 	)
-	// }
-
-	fmt.Fprintf(
-		w, "%v\t%v\t%v\t\n%v\t%v\t%v\t\n%v\t%v\t%v\t\n%v\t%v\t%v\t\n",
-		"LDS", "CLIENT_ACKED", "1594852577637078317",
-		"RDS", "CLIENT_ACKED", "1595268153502909101",
-		"CDS", "CLIENT_REQUESTED", "N/A",
-		"EDS", "CLIENT_ACKED", "1595644593548779066",
-	)
-
+	fmt.Fprintln(w, "Name\tStatus\tVersion\tType\tLastUpdated")
+	config := clientStatus.Config[0]
+	for _, xdsConfig := range config.XdsConfig {
+		switch x := xdsConfig.PerXdsConfig.(type) {
+		case *csdspb.PerXdsConfig_ListenerConfig:
+			for _, dynamicListener := range xdsConfig.GetListenerConfig().DynamicListeners {
+				var entry = xdsResourceStatusEntry{
+					Name:   dynamicListener.Name,
+					Status: dynamicListener.ClientStatus,
+				}
+				if state := dynamicListener.GetActiveState(); state != nil {
+					entry.Version = state.VersionInfo
+					entry.Type = state.Listener.TypeUrl
+					entry.LastUpdated = state.LastUpdated
+				}
+				printStatusEntry(&entry)
+			}
+		case *csdspb.PerXdsConfig_RouteConfig:
+			for _, dynamicRouteConfig := range xdsConfig.GetRouteConfig().DynamicRouteConfigs {
+				var entry = xdsResourceStatusEntry{
+					Status:      dynamicRouteConfig.ClientStatus,
+					Version:     dynamicRouteConfig.VersionInfo,
+					Type:        dynamicRouteConfig.RouteConfig.TypeUrl,
+					LastUpdated: dynamicRouteConfig.LastUpdated,
+				}
+				if packed := dynamicRouteConfig.GetRouteConfig(); packed != nil {
+					var routeConfig routepb.RouteConfiguration
+					if err := ptypes.UnmarshalAny(packed, &routeConfig); err != nil {
+						return err
+					}
+					entry.Name = routeConfig.Name
+				}
+				printStatusEntry(&entry)
+			}
+		case *csdspb.PerXdsConfig_ClusterConfig:
+			for _, dynamicCluster := range xdsConfig.GetClusterConfig().DynamicActiveClusters {
+				var entry = xdsResourceStatusEntry{
+					Status:      dynamicCluster.ClientStatus,
+					Version:     dynamicCluster.VersionInfo,
+					Type:        dynamicCluster.Cluster.TypeUrl,
+					LastUpdated: dynamicCluster.LastUpdated,
+				}
+				if packed := dynamicCluster.GetCluster(); packed != nil {
+					var cluster clusterpb.Cluster
+					if err := ptypes.UnmarshalAny(packed, &cluster); err != nil {
+						return err
+					}
+					entry.Name = cluster.Name
+				}
+				printStatusEntry(&entry)
+			}
+		case *csdspb.PerXdsConfig_EndpointConfig:
+			for _, dynamicEndpoint := range xdsConfig.GetEndpointConfig().GetDynamicEndpointConfigs() {
+				var entry = xdsResourceStatusEntry{
+					Status:      dynamicEndpoint.ClientStatus,
+					Version:     dynamicEndpoint.VersionInfo,
+					Type:        dynamicEndpoint.EndpointConfig.TypeUrl,
+					LastUpdated: dynamicEndpoint.LastUpdated,
+				}
+				if packed := dynamicEndpoint.GetEndpointConfig(); packed != nil {
+					var endpoint endpointpb.ClusterLoadAssignment
+					if err := ptypes.UnmarshalAny(packed, &endpoint); err != nil {
+						return err
+					}
+					entry.Name = endpoint.ClusterName
+				}
+				printStatusEntry(&entry)
+			}
+		default:
+			return fmt.Errorf("Unexpected type %T", x)
+		}
+	}
 	w.Flush()
 	return nil
 }

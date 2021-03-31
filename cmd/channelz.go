@@ -68,8 +68,7 @@ func prettyAddress(addr *zpb.Address) string {
 		var ip net.IP = net.IP(ipPort.IpAddress)
 		return fmt.Sprintf("%v:%v", ip, ipPort.Port)
 	}
-	// TODO: Other Address types
-	return ""
+	panic(fmt.Sprintf("Address type not supported for %s", addr))
 }
 
 func printChannelTraceEvents(events []*zpb.ChannelTraceEvent) {
