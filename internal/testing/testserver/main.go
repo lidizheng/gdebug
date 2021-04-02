@@ -4,16 +4,23 @@ package main
 
 import (
 	"context"
+	"crypto/tls"
 	"flag"
 	"fmt"
 	"io/ioutil"
+	"log"
+	"math/rand"
 	"net"
 	"os"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/channelz/service"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/health"
 	"google.golang.org/grpc/reflection"
+	"google.golang.org/grpc/testdata"
 
 	_ "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/fault/v3"
 	_ "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/router/v3"
@@ -25,9 +32,12 @@ import (
 )
 
 var (
-	servingPortFlag = flag.Int("serving", 10001, "the serving port")
-	adminPortFlag   = flag.Int("admin", 50051, "the admin port")
-	healthFlag      = flag.Bool("health", true, "the health checking status")
+	servingPortFlag     = flag.Int("serving", 10001, "the serving port")
+	adminPortFlag       = flag.Int("admin", 50051, "the admin port")
+	secureAdminPortFlag = flag.Int("secure_admin", 50052, "the secure admin port")
+	healthFlag          = flag.Bool("health", true, "the health checking status")
+	qpsFlag             = flag.Int("qps", 10, "The size of the generated load against itself")
+	abortPercentageFlag = flag.Int("abort", 10, "The percentage of failed RPCs")
 )
 
 // Implements the Greeter service
@@ -36,6 +46,13 @@ type server struct {
 }
 
 func (s *server) SayHello(ctx context.Context, in *pb.HelloRequest) (*pb.HelloReply, error) {
+	r := rand.New(rand.NewSource(time.Now().UnixNano()))
+	if int(r.Int31n(100)) <= *abortPercentageFlag {
+		return nil, grpc.Errorf(
+			codes.Code(r.Int31n(15)+1),
+			"Fault injected",
+		)
+	}
 	return &pb.HelloReply{Message: "Hello " + in.Name}, nil
 }
 
@@ -60,24 +77,7 @@ func (*mockCsdsServer) FetchClientStatus(ctx context.Context, req *csdspb.Client
 	return &response, nil
 }
 
-func main() {
-	// Creates the primary server
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *servingPortFlag))
-	if err != nil {
-		panic(err)
-	}
-	defer lis.Close()
-	fmt.Printf("Serving business logic on :%d\n", *servingPortFlag)
-	s := grpc.NewServer()
-	pb.RegisterGreeterServer(s, &server{})
-	go s.Serve(lis)
-	// Creates the admin server
-	lis, err = net.Listen("tcp", fmt.Sprintf(":%d", *adminPortFlag))
-	if err != nil {
-		panic(err)
-	}
-	defer lis.Close()
-	s = grpc.NewServer()
+func setupAdminServer(s *grpc.Server) {
 	reflection.Register(s)
 	service.RegisterChannelzServiceToServer(s)
 	csdspb.RegisterClientStatusDiscoveryServiceServer(s, &mockCsdsServer{})
@@ -88,8 +88,56 @@ func main() {
 		healthcheck.SetServingStatus("", healthpb.HealthCheckResponse_NOT_SERVING)
 	}
 	healthpb.RegisterHealthServer(s, healthcheck)
-	fmt.Printf("Serving Admin Services on :%d\n", *adminPortFlag)
+}
+
+func main() {
+	// Creates the primary server
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *servingPortFlag))
+	if err != nil {
+		panic(err)
+	}
+	defer lis.Close()
+	fmt.Printf("Serving business logic on :%d\n", *servingPortFlag)
+	cert, err := tls.LoadX509KeyPair(testdata.Path("server1.pem"), testdata.Path("server1.key"))
+	if err != nil {
+		log.Fatalf("failed to load key pair: %s", err)
+	}
+	s := grpc.NewServer(grpc.Creds(credentials.NewServerTLSFromCert(&cert)))
+	pb.RegisterGreeterServer(s, &server{})
 	go s.Serve(lis)
-	/***** Wait for user exiting the program *****/
-	select {}
+	// Creates the admin server without credentials
+	insecureListener, err := net.Listen("tcp", fmt.Sprintf(":%d", *adminPortFlag))
+	if err != nil {
+		panic(err)
+	}
+	defer insecureListener.Close()
+	insecureAdminServer := grpc.NewServer()
+	setupAdminServer(insecureAdminServer)
+	go insecureAdminServer.Serve(insecureListener)
+	fmt.Printf("Serving Insecure Admin Services on :%d\n", *adminPortFlag)
+	// Creates the admin server with credentials
+	secureListener, err := net.Listen("tcp", fmt.Sprintf(":%d", *secureAdminPortFlag))
+	if err != nil {
+		panic(err)
+	}
+	defer secureListener.Close()
+	secureAdminServer := grpc.NewServer(grpc.Creds(credentials.NewServerTLSFromCert(&cert)))
+	setupAdminServer(secureAdminServer)
+	go secureAdminServer.Serve(secureListener)
+	fmt.Printf("Serving Secure Admin Services on :%d\n", *secureAdminPortFlag)
+	// Creates a client to hydrate the primary server
+	creds, err := credentials.NewClientTLSFromFile(testdata.Path("ca.pem"), "*.test.youtube.com")
+	if err != nil {
+		panic(err)
+	}
+	conn, err := grpc.Dial(fmt.Sprintf("localhost:%d", *servingPortFlag), grpc.WithTransportCredentials(creds))
+	if err != nil {
+		panic(err)
+	}
+	defer conn.Close()
+	greeterClient := pb.NewGreeterClient(conn)
+	for {
+		greeterClient.SayHello(context.Background(), &pb.HelloRequest{Name: "world"})
+		time.Sleep(time.Second / time.Duration(*qpsFlag))
+	}
 }

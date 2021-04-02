@@ -5,7 +5,6 @@ import (
 	"log"
 	"time"
 
-	_ "github.com/envoyproxy/go-control-plane/envoy/extensions/filters/http/router/v3"
 	csdspb "github.com/envoyproxy/go-control-plane/envoy/service/status/v3"
 	"google.golang.org/grpc"
 	zpb "google.golang.org/grpc/channelz/grpc_channelz_v1"
@@ -108,31 +107,34 @@ func Socket(socketID int64) *zpb.Socket {
 	return socket.Socket
 }
 
-// ServerSockets returns all sockets for servers
-func ServerSockets() []*zpb.Socket {
+// ServerSocket returns all sockets of this server
+func ServerSocket(serverId int64) []*zpb.Socket {
 	var s []*zpb.Socket
-	for _, server := range Servers() {
-		serverSocketResp, err := channelzClient.GetServerSockets(
-			context.Background(),
-			&zpb.GetServerSocketsRequest{ServerId: server.Ref.ServerId},
-		)
-		if err != nil {
-			log.Fatalf("failed to fetch server sockets (id=%v): %v", server.Ref.ServerId, err)
-		}
-		for _, socketRef := range serverSocketResp.SocketRef {
-			s = append(s, Socket(socketRef.SocketId))
-		}
+	serverSocketResp, err := channelzClient.GetServerSockets(
+		context.Background(),
+		&zpb.GetServerSocketsRequest{ServerId: serverId},
+	)
+	if err != nil {
+		log.Fatalf("failed to fetch server sockets (id=%v): %v", serverId, err)
+	}
+	for _, socketRef := range serverSocketResp.SocketRef {
+		s = append(s, Socket(socketRef.SocketId))
 	}
 	return s
 }
 
-// ChannelSockets returns all sockets for clients (channels)
-func ChannelSockets() []*zpb.Socket {
+// ServerSockets returns all sockets for servers
+func Sockets() []*zpb.Socket {
 	var s []*zpb.Socket
+	// Gather client sockets
 	for _, subchannel := range Subchannels() {
 		for _, socketRef := range subchannel.SocketRef {
 			s = append(s, Socket(socketRef.SocketId))
 		}
+	}
+	// Gather server sockets
+	for _, server := range Servers() {
+		s = append(s, ServerSocket(server.Ref.ServerId)...)
 	}
 	return s
 }

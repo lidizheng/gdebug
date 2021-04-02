@@ -8,11 +8,12 @@ import (
 )
 
 var healthCmd = &cobra.Command{
-	Use:   "health",
-	Short: "Check health status of the target application.",
+	Use:   "health [service names...]",
+	Short: "Check health status of the target service (default \"\").",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if len(args) == 0 {
 			fmt.Println(transport.GetHealthStatus(""))
+			return nil
 		}
 		for _, service := range args {
 			fmt.Fprintf(

@@ -8,12 +8,11 @@ import (
 	"os"
 
 	"grpcdebug/transport"
-	"grpcdebug/utils"
 
 	"github.com/spf13/cobra"
 )
 
-var verboseFlag bool
+var verboseFlag, timestampFlag bool
 var address, security, credFile, serverNameOverride string
 
 var rootUsageTemplate = `Usage:{{if .Runnable}}
@@ -47,23 +46,24 @@ var rootCmd = &cobra.Command{
 }
 
 func initConfig() {
-	// After the verbose is set, we can use Debugf to log
-	if verboseFlag {
-		utils.SetVerbose()
+	config := transport.GetServerConfig(address)
+	if credFile != "" {
+		config.IdentityFile = credFile
+	}
+	if serverNameOverride != "" {
+		config.ServerNameOverride = serverNameOverride
 	}
 	if security == "tls" {
-		if credFile == "" {
+		config.Security = transport.TypeTls
+		if config.IdentityFile == "" {
 			rootCmd.Usage()
 			log.Fatalf("Please specify credential file under [tls] mode.")
 		}
-	} else if security == "google-default" {
-		rootCmd.Usage()
-		log.Fatalf("Not implemented security type: google-default")
 	} else if security != "insecure" {
 		rootCmd.Usage()
-		log.Fatalf("Unrecognized security type: %v", security)
+		log.Fatalf("Unrecognized security mode: %v", security)
 	}
-	transport.Connect(address, credFile, serverNameOverride)
+	transport.Connect(address, config.IdentityFile, config.ServerNameOverride)
 }
 
 // ChildCommandPath used in template
@@ -81,6 +81,7 @@ func init() {
 	rootCmd.SetUsageTemplate(rootUsageTemplate)
 
 	rootCmd.PersistentFlags().BoolVarP(&verboseFlag, "verbose", "v", false, "Print verbose information for debugging")
+	rootCmd.PersistentFlags().BoolVarP(&timestampFlag, "timestamp", "t", false, "Print timestamp as RFC3339 instead of human readable strings")
 	rootCmd.PersistentFlags().StringVar(&security, "security", "insecure", "Defines the type of credentials to use [tls, google-default, insecure]")
 	rootCmd.PersistentFlags().StringVar(&credFile, "credential_file", "", "Sets the path of the credential file; used in [tls] mode")
 	rootCmd.PersistentFlags().StringVar(&serverNameOverride, "server_name_override", "", "Overrides the peer server name if non empty; used in [tls] mode")
